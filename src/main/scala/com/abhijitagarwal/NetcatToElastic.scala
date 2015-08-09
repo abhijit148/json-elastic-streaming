@@ -37,16 +37,16 @@ object NetcatToElastic {
     val records = lines.map { line => JsonParser(line.toLowerCase).convertTo[Record] }
 
     // Make a list of all URLs per id sorted by time
-    val records_all = records.map { record => (record.id, Stream(record)) }.reduceByKey(mergeRecords)
+    val recordsAll = records.map { record => (record.id, Stream(record)) }.reduceByKey(mergeRecords)
 
     // Get the last 5 URLs per id
     case class EsRecord(id: Int, url: Seq[String])
-    val id_urls_last_n = records_all.map {
-      case (id, id_records) => EsRecord(id, id_records.map(_.url).reverse.take(lastNUrls))
+    val idUrlsLastN = recordsAll.map {
+      case (id, idRecords) => EsRecord(id, idRecords.map(_.url).takeRight(lastNUrls))
     }
 
     //Save to Elastic Search
-    id_urls_last_n.foreachRDD { rdd =>
+    idUrlsLastN.foreachRDD { rdd =>
       EsSpark.saveToEs(rdd, "spark/docs", Map("es.mapping.id" -> "id"))
     }
 
