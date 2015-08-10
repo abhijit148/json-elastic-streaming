@@ -33,29 +33,30 @@ object NetcatToElastic {
     // Create a DStream that will connect to hostname:port, like localhost:9999
     val lines = ssc.socketTextStream(config.getString("netcat.host"), config.getInt("netcat.port"))
 
-    // Parse JSON into a Record case class and sort by time
+    // Parse JSON into a Record case class
     val records = lines.map { line => JsonParser(line.toLowerCase).convertTo[Record] }
 
-    // Make a list of all URLs per id sorted by time
+    // Make a list of all records per id and sorted by time
     val recordsAll = records.map { record => (record.id, Stream(record)) }.reduceByKey(mergeRecords)
 
-    // Get the last 5 URLs per id
+    // Get the last N URLs per id
     case class EsRecord(id: Int, url: Seq[String])
     val idUrlsLastN = recordsAll.map {
       case (id, idRecords) => EsRecord(id, idRecords.map(_.url).takeRight(lastNUrls))
     }
 
-    //Save to Elastic Search
+    // Save to Elastic Search
     idUrlsLastN.foreachRDD { rdd =>
       EsSpark.saveToEs(rdd, "spark/docs", Map("es.mapping.id" -> "id"))
     }
 
+    // Start streaming
     ssc.start()
     ssc.awaitTermination()
 
   }
 
-  // This method merges two sorted streams of records into one sorted stream
+  // This method merges two time sorted record streams into one time sorted record stream
   // src: http://codereview.stackexchange.com/questions/21575/merge-sort-in-scala
   def mergeRecords(first: Stream[Record], second: Stream[Record]): Stream[Record] = {
     (first, second) match {

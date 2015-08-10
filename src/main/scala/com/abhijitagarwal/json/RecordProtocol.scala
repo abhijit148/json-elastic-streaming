@@ -8,5 +8,5 @@ import spray.json.DefaultJsonProtocol
 case class Record(id: Int, url: String, time: Long)
 
 object RecordProtocol extends DefaultJsonProtocol {
-  implicit val colorFormat = jsonFormat3(Record)
+  implicit val recordFormat = jsonFormat3(Record)
 }
